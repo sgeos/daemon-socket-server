@@ -19,7 +19,7 @@ void initLog(char *pLogName)
 {
   openlog(pLogName, LOG_CONS | LOG_NDELAY | LOG_PERROR | LOG_PID, LOG_DAEMON);
   setlogmask(LOG_UPTO(LOG_DEBUG));
-  notice("Daemon started.\n");
+  notice("Started logging.\n");
 }
 
 void stopLog()

@@ -9,9 +9,9 @@
 #include "log.h"
 #include "utility.h"
 
+const int SLEEP_DELAY = 0;
 const char SAFE_DIR[] = "/";
 const char DEV_NULL_DIR[] = "/dev/null";
-const int MAIN_LOOP_DELAY = 0;
 
 bool mainLoop(int argc, char **argv);
 
@@ -66,27 +66,31 @@ void closeAllOpenFileDescrtiptors()
   stderr = fopen(DEV_NULL_DIR, "w+");
 }
 
-static void initDaemon(char *pLogName)
+static void init(bool pDaemon, char *pLogName, char *pSafeDir)
 {
-  forkChildAndExit();
-  becomeSessionLeader();
-  initSignals();
-  forkChildAndExit(); // guarantee daemon is detached from a terminal permanently
-  setFilePermissions();
-  closeAllOpenFileDescrtiptors();
-  initLog(pLogName);
-  moveToSafeDirectory(SAFE_DIR);
-}
+  if (pDaemon) {
+    forkChildAndExit();
+    becomeSessionLeader();
+    initSignals();
+    forkChildAndExit(); // guarantee daemon is detached from a terminal permanently
+    setFilePermissions();
+    closeAllOpenFileDescrtiptors();
+  }
 
-static void initInteractive(char *pLogName)
-{
+  // always do the following
   initLog(pLogName);
   moveToSafeDirectory(SAFE_DIR);
+
+  if (pDaemon) {
+    notice("Started as daemon.");
+  else {
+    notice("Started as interactive program.");
+  }
 }
 
 static void cleanup()
 {
-  notice("Daemon terminated.");
+  notice("Program terminated.");
   stopLog();
 }
 
@@ -113,28 +117,31 @@ int argsDaemon(int argc, char **argv, int argn, args_param_t *argsparam, void *d
 int main(int argc, char **argv)
 {
   bool daemon = true;
+  char *logName = argv[0];
+  char *safeDir = SAFE_DIR;
+  int sleepDelay = SLEEP_DELAY;
   args_param_t args_param_list[] =
   {
-    {"-i",            &daemon, argsInteractive },
-    {"--interactive", &daemon, argsInteractive },
-    {"-d",            &daemon, argsDaemon },
-    {"--daemon",      &daemon, argsDaemon },
+    {"-i",            &daemon,     argsInteractive },
+    {"--interactive", &daemon,     argsInteractive },
+    {"-d",            &daemon,     argsDaemon },
+    {"--daemon",      &daemon,     argsDaemon },
+    {"-s",            &sleepDelay, argsInteger },
+    {"--sleep",       &sleepDelay, argsInteger },
+    {"-l",            &logName,    argsString },
+    {"--log",         &logName,    argsString },
+    {"--dir",         &safeDir,    argsString },
     ARGS_DONE
   };
   argsProcess(argc, argv, args_param_list);
 
-  if (daemon) {
-    initDaemon(argv[0]);
-    notice("Started as daemon.");
-  } else {
-    initInteractive(argv[0]);
-    notice("Started as interactive program.");
-  }
+  init(daemon, logName, safeDir);
 
   // run mainLoop() before calling sleep so that local control responds right away
+  // if done is true after the first execution, the program will exit right away
   bool done = mainLoop(argc, argv);
   while (!done) {
-    sleep(MAIN_LOOP_DELAY);
+    sleep(sleepDelay);
     done = mainLoop(argc, argv);
   }
 
