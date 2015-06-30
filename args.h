@@ -29,6 +29,7 @@
 
 // library headers
 #include <stddef.h>
+#include <stdbool.h>
 
 // types
 typedef struct args_param_t args_param_t;
@@ -53,11 +54,13 @@ struct args_param_t
 void argsProcess (int argc, char *argv[], args_param_t *pParams);
 
 // scan basic types of command line arguments
-int  argsInteger  (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
-int  argsFloat    (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
-int  argsString   (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
-char argsGetToken (void);
-void argsSetToken (char pToken);
+int  argsInteger   (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
+int  argsFloat     (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
+int  argsString    (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
+int  argsBoolTrue  (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
+int  argsBoolFalse (int argc, char *argv[], int argn, struct args_param_t *args_param, void *data);
+char argsGetToken  (void);
+void argsSetToken  (char pToken);
 
 #endif // ARGS_H
 

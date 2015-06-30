@@ -45,7 +45,7 @@ bool localControl(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSi
     done = true;
   }
   else {
-    noticef("Unknown local control command \"%s\".", messageBuffer);
+    infof("Unknown local control command \"%s\".", messageBuffer);
   }
   return done;
 }

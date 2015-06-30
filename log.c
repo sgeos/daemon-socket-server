@@ -19,7 +19,7 @@ void initLog(const char *pLogName)
 {
   openlog(pLogName, LOG_CONS | LOG_NDELAY | LOG_PERROR | LOG_PID, LOG_DAEMON);
   setlogmask(LOG_UPTO(LOG_DEBUG));
-  notice("Started logging.\n");
+  infof("Started logging to \"%s\".\n", pLogName);
 }
 
 void stopLog()

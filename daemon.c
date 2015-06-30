@@ -53,6 +53,9 @@ void moveToSafeDirectory(const char *pSafeDir)
     errorf("Could not change working directory to: %s\n", pSafeDir);
     exit(EXIT_FAILURE);
   }
+  else {
+    infof("Changed working directory to: %s\n", pSafeDir);
+  }
 }
 
 void closeAllOpenFileDescrtiptors()
@@ -95,26 +98,6 @@ static void cleanup()
   stopLog();
 }
 
-int argsInteractive(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
-{
-  // unused parameters
-  UNUSED(argc); UNUSED(argv); UNUSED(argn); UNUSED(argsparam);
-
-  bool *daemonFlag = (bool *)data;
-  *daemonFlag = false;
-  return 1;
-}
-
-int argsDaemon(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
-{
-  // unused parameters
-  UNUSED(argc); UNUSED(argv); UNUSED(argn); UNUSED(argsparam);
-
-  bool *daemonFlag = (bool *)data;
-  *daemonFlag = true;
-  return 1;
-}
-
 int main(int argc, char **argv)
 {
   bool daemon = true;
@@ -123,10 +106,10 @@ int main(int argc, char **argv)
   int sleepDelay = SLEEP_DELAY;
   args_param_t args_param_list[] =
   {
-    {"-i",            &daemon,     argsInteractive },
-    {"--interactive", &daemon,     argsInteractive },
-    {"-d",            &daemon,     argsDaemon },
-    {"--daemon",      &daemon,     argsDaemon },
+    {"-i",            &daemon,     argsBoolFalse },
+    {"--interactive", &daemon,     argsBoolFalse },
+    {"-d",            &daemon,     argsBoolTrue },
+    {"--daemon",      &daemon,     argsBoolTrue },
     {"-s",            &sleepDelay, argsInteger },
     {"--sleep",       &sleepDelay, argsInteger },
     {"-l",            &logName,    argsString },
@@ -137,6 +120,7 @@ int main(int argc, char **argv)
   argsProcess(argc, argv, args_param_list);
 
   init(daemon, logName, safeDir);
+  infof("Sleep delay set to %d second(s).", sleepDelay);
 
   // run mainLoop() before calling sleep so that local control responds right away
   // if done is true after the first execution, the program will exit right away

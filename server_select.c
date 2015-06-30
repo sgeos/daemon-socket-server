@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include "utility.h"
+#include "args.h"
 #include "log.h"
 
 const char *PORT = "32001";
@@ -29,6 +30,7 @@ bool getAddressInfo(const char *pPort, struct addrinfo **pAddressInfo)
   hints->ai_flags = AI_PASSIVE;
   bool success = 0 == getaddrinfo(NULL, pPort, hints, pAddressInfo);
   free(hints);
+  noticef("Port set to %s.", pPort);
 
   if (!success) {
     error("Failed to get address info.");
@@ -73,6 +75,7 @@ bool socketAddressBind(int pSocket, struct addrinfo *pAddressInfo)
 bool socketListen(int pSocket, int pBacklog)
 {
   bool success = 0 <= listen(pSocket, pBacklog);
+  infof("Socket connection backlog set to %d.", pBacklog);
   if (!success) {
     error("Failed to listen");
   }
@@ -99,6 +102,10 @@ bool socketSetInitialize(int pSocket, fd_set *pSocketSet, bool pInteractive)
   FD_SET(pSocket, pSocketSet);
   if (pInteractive) {
     FD_SET(STDIN_FILENO, pSocketSet);
+    info("Local control commands enabled.");
+  }
+  else {
+    info("Local control commands disabled.");
   }
   bool success = true;
   return success;
@@ -138,17 +145,35 @@ bool socketConnectionNew(int pSocket, int *pMaxSocket, fd_set *pSocketSet)
 
 bool mainLoop(int argc, char **argv)
 {
-  UNUSED(argc);
-  UNUSED(argv);
   const char *port = PORT;
   int backlog = BACKLOG;
+  int bufferSize = BUFFER_SIZE;
   bool interactive = INTERACTIVE;
+  args_param_t args_param_list[] =
+  {
+    {"-p",            &port,        argsString },
+    {"--port",        &port,        argsString },
+    {"-b",            &backlog,     argsInteger },
+    {"--backlog",     &backlog,     argsInteger },
+    {"-B",            &bufferSize,  argsInteger },
+    {"--buffer",      &bufferSize,  argsInteger },
+    {"-i",            &interactive, argsBoolTrue },
+    {"--interactive", &interactive, argsBoolTrue },
+    {"-d",            &interactive, argsBoolFalse },
+    {"--daemon",      &interactive, argsBoolFalse },
+    ARGS_DONE
+  };
+  argsProcess(argc, argv, args_param_list);
+
   int socket = -1;
   fd_set socketSet;
 
   bool success = true;
   success = success && socketOpen(port, backlog, &socket);
   success = success && socketSetInitialize(socket, &socketSet, interactive);
+  if (success) {
+    infof("Message buffer size set to %d.", bufferSize);
+  }
 
   // main loop
   int maxSocket = socket;
@@ -163,12 +188,10 @@ bool mainLoop(int argc, char **argv)
         }
         else if (STDIN_FILENO == s) {
           // system control
-          int bufferSize = BUFFER_SIZE;
           done = localControl(s, &socketSet, maxSocket, bufferSize);
         }
         else {
           // existing connection
-          int bufferSize = BUFFER_SIZE;
           socketProtocol(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
         }
       }

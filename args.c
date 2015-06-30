@@ -128,6 +128,28 @@ int argsString(int argc, char *argv[], int argn, struct args_param_t *args_param
   return result;
 }
 
+// sets a bool to true if the command line option is present
+int argsBoolTrue(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
+{
+  // unused parameters
+  (void)argc; (void)argv; (void)argn; (void)argsparam;
+  
+  bool *flag = (bool *)data;
+  *flag = true;
+  return 1;
+}
+
+// sets a bool to false if the command line option is present
+int argsBoolFalse(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
+{
+  // unused parameters
+  (void)argc; (void)argv; (void)argn; (void)argsparam;
+  
+  bool *flag = (bool *)data;
+  *flag = false;
+  return 1;
+}
+
 // scan data into variable and report number of arguments consumed
 int argsParamEntryProcess(int argc, char *argv[], int argn, args_param_t *args_param)
 {
