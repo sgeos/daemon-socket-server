@@ -7,10 +7,12 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <netdb.h>
+#include "utility.h"
+#include "log.h"
 
 bool socketProtocol(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
-  printf("Communication on socket %d.\n", pSocket);
+  infof("Communication on socket %d.\n", pSocket);
 
   // send(), recv(), close()
   // Call FD_CLR(pSocket, pSocketSet) on disconnection
@@ -35,12 +37,12 @@ bool socketProtocol(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   {
     close(pSocket);
     FD_CLR(pSocket, pSocketSet);
-    printf("Client disconnected socket %d.\n", pSocket);
+    noticef("Client disconnected from socket %d.\n", pSocket);
     fflush(stdout);
   }
   else if (messageSize < 0)
   {
-    perror("recv failed");
+    warningf("Failed to receive data from socket %d.", pSocket);
     success = false;
   }
   return success;

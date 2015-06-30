@@ -1,7 +1,7 @@
 CC=cc
 CFLAGS=-c -std=c11 -Wall -Wextra -Wpedantic -D DEBUG=0
 LDFLAGS=
-SHARED_SOURCES=daemon.c args.c server_select.c local_control.c
+SHARED_SOURCES=daemon.c args.c log.c server_select.c local_control.c
 SHARED_OBJECTS=$(SHARED_SOURCES:.c=.o)
 EXECUTABLES=relay_chat args_test
 

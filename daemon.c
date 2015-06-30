@@ -5,13 +5,13 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <syslog.h>
 #include "args.h"
+#include "log.h"
 #include "utility.h"
 
 const char SAFE_DIR[] = "/";
 const char DEV_NULL_DIR[] = "/dev/null";
-const int MAIN_LOOP_DELAY = 20;
+const int MAIN_LOOP_DELAY = 0;
 
 bool mainLoop(int argc, char **argv);
 
@@ -50,7 +50,7 @@ void setFilePermissions()
 void moveToSafeDirectory(const char *pSafeDir)
 {
   if (chdir(pSafeDir) < 0) {
-    syslog(LOG_ERR, "Could not change working directory to: %s\n", pSafeDir);
+    errorf("Could not change working directory to: %s\n", pSafeDir);
     exit(EXIT_FAILURE);
   }
 }
@@ -66,17 +66,6 @@ void closeAllOpenFileDescrtiptors()
   stderr = fopen(DEV_NULL_DIR, "w+");
 }
 
-void initSyslog(char *pLogName)
-{
-  openlog(pLogName, LOG_PID, LOG_DAEMON); 
-  syslog(LOG_NOTICE, "Daemon started.\n"); 
-}
-
-void stopSyslog()
-{
-  closelog();
-}
-
 static void initDaemon(char *pLogName)
 {
   forkChildAndExit();
@@ -85,20 +74,20 @@ static void initDaemon(char *pLogName)
   forkChildAndExit(); // guarantee daemon is detached from a terminal permanently
   setFilePermissions();
   closeAllOpenFileDescrtiptors();
-  initSyslog(pLogName);
+  initLog(pLogName);
   moveToSafeDirectory(SAFE_DIR);
 }
 
 static void initInteractive(char *pLogName)
 {
-  initSyslog(pLogName);
+  initLog(pLogName);
   moveToSafeDirectory(SAFE_DIR);
 }
 
 static void cleanup()
 {
-  syslog(LOG_NOTICE, "Daemon terminated.");
-  stopSyslog();
+  notice("Daemon terminated.");
+  stopLog();
 }
 
 int argsInteractive(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
@@ -136,17 +125,17 @@ int main(int argc, char **argv)
 
   if (daemon) {
     initDaemon(argv[0]);
-    syslog(LOG_NOTICE, "Daemon running.");
+    notice("Started as daemon.");
   } else {
     initInteractive(argv[0]);
-    syslog(LOG_NOTICE, "Daemon running - interactive.");
+    notice("Started as interactive program.");
   }
 
-  bool done = false;
-  while (!done)
-  {
-    done = mainLoop(argc, argv);
+  // run mainLoop() before calling sleep so that local control responds right away
+  bool done = mainLoop(argc, argv);
+  while (!done) {
     sleep(MAIN_LOOP_DELAY);
+    done = mainLoop(argc, argv);
   }
 
   cleanup();

@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include "utility.h"
+#include "log.h"
 
 const char *PORT = "32001";
 const int BACKLOG = 10;
@@ -30,7 +31,7 @@ bool getAddressInfo(const char *pPort, struct addrinfo **pAddressInfo)
   free(hints);
 
   if (!success) {
-    perror("getaddrinfo");
+    error("Failed to get address info.");
   }
   return success;
 }
@@ -40,7 +41,7 @@ bool createSocket(struct addrinfo *pAddressInfo, int *pSocket)
   *pSocket = socket(pAddressInfo->ai_family, pAddressInfo->ai_socktype, pAddressInfo->ai_protocol);
   bool success = 0 <= *pSocket;
   if (!success) {
-    perror("socket");
+   error("Failed to create socket");
   }
   return success;
 }
@@ -49,7 +50,7 @@ bool socketAddressReuse(int pSocket, int pReuseAddress)
 {
   bool success = 0 <= setsockopt(pSocket, SOL_SOCKET, SO_REUSEADDR, &pReuseAddress, sizeof(int));
   if (!success) {
-    perror("setsockopt");
+    error("Failed to set reuse socket address option.");
   }
   return success;
 }
@@ -61,10 +62,10 @@ bool socketAddressBind(int pSocket, struct addrinfo *pAddressInfo)
   char ip4[INET_ADDRSTRLEN];  // space to hold the IPv4 string
   struct sockaddr_in sa = *(struct sockaddr_in *)(pAddressInfo->ai_addr);
   inet_ntop(AF_INET, &(sa.sin_addr), ip4, INET_ADDRSTRLEN);
-  printf("bind to address %s\n", ip4);
+  noticef("Bound to address %s\n", ip4);
 
   if (!success) {
-    perror("bind");
+    error("Failed to bind.");
   }
   return success;
 }
@@ -73,7 +74,7 @@ bool socketListen(int pSocket, int pBacklog)
 {
   bool success = 0 <= listen(pSocket, pBacklog);
   if (!success) {
-    perror("listen");
+    error("Failed to listen");
   }
   return success;
 }
@@ -107,7 +108,7 @@ bool socketSelect(int pMaxSocket, fd_set *pSocketSet)
 {
   bool success = 0 <= select(pMaxSocket + 1, pSocketSet, NULL, NULL, NULL);
   if (!success) {
-    perror("select");
+    error("Failed to read from socket using select.");
   }
   return success;
 }
@@ -120,11 +121,11 @@ bool socketConnectionNew(int pSocket, int *pMaxSocket, fd_set *pSocketSet)
   socklen_t size = sizeof(struct sockaddr_in);
   newSocket = accept(pSocket, (struct sockaddr*)&incomingAddress, &size);
   if (newSocket < 0) {
-    perror("accept");
+    error("Failed to accept new socket connection");
     success = false;
   }
   else {
-    printf("New connection from %s on port %d.\n", 
+    noticef("New connection from %s on port %d.\n", 
       inet_ntoa(incomingAddress.sin_addr), htons(incomingAddress.sin_port));
     FD_SET(newSocket, pSocketSet);
     if (*pMaxSocket < newSocket) {
