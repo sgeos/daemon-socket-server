@@ -32,7 +32,7 @@ extern const char *logLevelString[];
 #define info(format) syslog(LOG_INFO, format)
 #define debug(format) syslog(LOG_DEBUG, format)
 
-void initLog(char *pLogName);
+void initLog(const char *pLogName);
 void stopLog();
 
 #endif // LOG_H

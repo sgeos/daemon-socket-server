@@ -66,7 +66,7 @@ void closeAllOpenFileDescrtiptors()
   stderr = fopen(DEV_NULL_DIR, "w+");
 }
 
-static void init(bool pDaemon, char *pLogName, char *pSafeDir)
+static void init(bool pDaemon, const char *pLogName, const char *pSafeDir)
 {
   if (pDaemon) {
     forkChildAndExit();
@@ -79,10 +79,11 @@ static void init(bool pDaemon, char *pLogName, char *pSafeDir)
 
   // always do the following
   initLog(pLogName);
-  moveToSafeDirectory(SAFE_DIR);
+  moveToSafeDirectory(pSafeDir);
 
   if (pDaemon) {
     notice("Started as daemon.");
+  }
   else {
     notice("Started as interactive program.");
   }
@@ -117,8 +118,8 @@ int argsDaemon(int argc, char **argv, int argn, args_param_t *argsparam, void *d
 int main(int argc, char **argv)
 {
   bool daemon = true;
-  char *logName = argv[0];
-  char *safeDir = SAFE_DIR;
+  const char *logName = argv[0];
+  const char *safeDir = SAFE_DIR;
   int sleepDelay = SLEEP_DELAY;
   args_param_t args_param_list[] =
   {
