@@ -1,0 +1,39 @@
+########################################
+# this project
+########################################
+*.o
+*.db
+relay_chat
+args_test
+
+########################################
+# Xcode
+########################################
+*~.nib
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.moved-aside
+xcuserdata
+DerivedData/
+build/
+!default.pbxuser
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+
+########################################
+# Android
+########################################
+Android/bin
+Android/gen
+
+########################################
+# OSX
+########################################
+*.swp
+*.lock
+.DS_Store
+.Trashes
+

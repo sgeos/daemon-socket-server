@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <syslog.h>
+#include "args.h"
+#include "utility.h"
 
 const char SAFE_DIR[] = "/";
 const char DEV_NULL_DIR[] = "/dev/null";
@@ -87,17 +89,59 @@ static void initDaemon(char *pLogName)
   moveToSafeDirectory(SAFE_DIR);
 }
 
-static void stopDaemon()
+static void initInteractive(char *pLogName)
+{
+  initSyslog(pLogName);
+  moveToSafeDirectory(SAFE_DIR);
+}
+
+static void cleanup()
 {
   syslog(LOG_NOTICE, "Daemon terminated.");
   stopSyslog();
 }
 
+int argsInteractive(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
+{
+  // unused parameters
+  UNUSED(argc); UNUSED(argv); UNUSED(argn); UNUSED(argsparam);
+
+  bool *daemonFlag = (bool *)data;
+  *daemonFlag = false;
+  return 1;
+}
+
+int argsDaemon(int argc, char **argv, int argn, args_param_t *argsparam, void *data)
+{
+  // unused parameters
+  UNUSED(argc); UNUSED(argv); UNUSED(argn); UNUSED(argsparam);
+
+  bool *daemonFlag = (bool *)data;
+  *daemonFlag = true;
+  return 1;
+}
+
 int main(int argc, char **argv)
 {
-  initDaemon(argv[0]);
+  bool daemon = true;
+  args_param_t args_param_list[] =
+  {
+    {"-i",            &daemon, argsInteractive },
+    {"--interactive", &daemon, argsInteractive },
+    {"-d",            &daemon, argsDaemon },
+    {"--daemon",      &daemon, argsDaemon },
+    ARGS_DONE
+  };
+  argsProcess(argc, argv, args_param_list);
 
-  syslog(LOG_NOTICE, "Daemon running.");
+  if (daemon) {
+    initDaemon(argv[0]);
+    syslog(LOG_NOTICE, "Daemon running.");
+  } else {
+    initInteractive(argv[0]);
+    syslog(LOG_NOTICE, "Daemon running - interactive.");
+  }
+
   bool done = false;
   while (!done)
   {
@@ -105,7 +149,7 @@ int main(int argc, char **argv)
     sleep(MAIN_LOOP_DELAY);
   }
 
-  stopDaemon();
+  cleanup();
   return EXIT_SUCCESS;
 }
 
