@@ -10,12 +10,11 @@
 #include "utility.h"
 #include "log.h"
 #include "network_message.h"
+#include "user_control.h"
 #include "protocol_wolf.h"
 
 buffer_t *gMessageBuffer = NULL;
 gameState *gGameState = NULL;
-fd_set gPlayerSet;
-fd_set gReadySet;
 
 void gamePendingPlayerReady()
 {
@@ -25,16 +24,17 @@ void gameUpdatePending(int pSocket, fd_set *pSocketSet, int pMaxSocket, char *pM
 {
   UNUSED(pSocketSet);
   if (isCommand("ready", pMessage)) {
-    FD_SET(pSocket, &gReadySet);
+    userReady(gGameState->userControl, pSocket);
     infof("Player %d is ready.", pSocket);
   }
   else {
-    FD_CLR(pSocket, &gReadySet);
+    userWait(gGameState->userControl, pSocket);
     infof("Player %d is not ready.", pSocket);
   }
-  if (1 < gGameState->playerCount && 0 == memcmp(&gPlayerSet, &gReadySet, sizeof(fd_set))) {
+  if (userTurnComplete(gGameState->userControl)) {
+    userNewTurn(gGameState->userControl);
     gGameState->status = GAME_STARTED;
-    networkMessageAll(&gPlayerSet, pMaxSocket, "game start");
+    networkMessageAll(&(gGameState->userControl->userSet), pMaxSocket, "game start");
     info("Game started.");
   }
 }
@@ -57,7 +57,7 @@ void gameUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, char *pMessage)
   }
 }
 
-bool gameStateInit(gameState **pGameState, int pPlayerCount, int pPlayerMax)
+bool gameStateInit(gameState **pGameState, int pPlayerMax)
 {
   bool success = true;
   if (NULL == *pGameState) {
@@ -69,26 +69,31 @@ bool gameStateInit(gameState **pGameState, int pPlayerCount, int pPlayerMax)
     else {
       // running into a malloc erro
       (*pGameState)->player = NULL;
-      (*pGameState)->playerCount = 0;
-      (*pGameState)->playerMax = 0;
       info("Allocated game state.");
     }
   }
   else {
     info("Game state already exists.");
   }
+  if (success && NULL == (*pGameState)->userControl) {
+    (*pGameState)->userControl = calloc(1, sizeof(userControl_t));
+    if (NULL == (*pGameState)->userControl) {
+      error("Failed to allocate user control struct.");
+      success = false;
+    }
+    else {
+      initUserControl_t((*pGameState)->userControl, 2);
+      info("Allocated user control struct.");
+    }
+  }
   if (success && NULL == (*pGameState)->player) {
     (*pGameState)->player = calloc(pPlayerMax, sizeof(gamePlayer *));
     if (NULL == (*pGameState)->player) {
       errorf("Failed to allocate array for %d player(s).", pPlayerMax);
-      (*pGameState)->playerCount = 0;
-      (*pGameState)->playerMax = 0;
       success = false;
     }
     else {
       infof("Allocate array for %d player(s).", pPlayerMax);
-      (*pGameState)->playerCount = pPlayerCount;
-      (*pGameState)->playerMax = pPlayerMax;
     }
   }
   else {
@@ -99,13 +104,12 @@ bool gameStateInit(gameState **pGameState, int pPlayerCount, int pPlayerMax)
 
 bool gameStateCleanup(gameState **pGameState)
 {
-  for (int i = 0; i < (*pGameState)->playerMax; i++) {
+  for (int i = 0; i < (*pGameState)->userControl->userCount; i++) {
     if (NULL != (*pGameState)->player[i]) {
       free((*pGameState)->player[i]);
-      (*pGameState)->playerCount--;
     }
   }
-  if (0 < (*pGameState)->playerMax) {
+  if (0 < (*pGameState)->userControl->userCount) {
     info("Released memory for individual player data.");
   }
   else {
@@ -114,8 +118,6 @@ bool gameStateCleanup(gameState **pGameState)
   if (NULL != (*pGameState)->player) {
     free((*pGameState)->player);
     (*pGameState)->player = NULL;
-    (*pGameState)->playerCount = 0;
-    (*pGameState)->playerMax = 0;
   }
   info("Released memory for player data array.");
   if (NULL != *pGameState) {
@@ -133,12 +135,9 @@ bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSi
   UNUSED(pSocketSet);
   UNUSED(pMaxSocket);
 
-  FD_ZERO(&gPlayerSet);
-  FD_ZERO(&gReadySet);
-
   bool success = true;
   success = success && bufferAllocate(&gMessageBuffer, pBufferSize);
-  success = success && gameStateInit(&gGameState, 0, pMaxSocket);
+  success = success && gameStateInit(&gGameState, pMaxSocket);
   gGameState->status = GAME_PENDING;
   return success;
 }
@@ -150,8 +149,7 @@ bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
   UNUSED(pBufferSize);
 
   infof("New connection on socket %d.\n", pSocket);
-  FD_SET(pSocket, &gPlayerSet);
-  gGameState->playerCount++;
+  userAdd(gGameState->userControl, pSocket);
   bool success = true;
   return success;
 }
@@ -180,9 +178,7 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   {
     close(pSocket);
     FD_CLR(pSocket, pSocketSet);
-    FD_CLR(pSocket, &gPlayerSet);
-    FD_CLR(pSocket, &gReadySet);
-    gGameState->playerCount--;
+    userRemove(&(*gGameState->userControl), pSocket);
     noticef("Client disconnected from socket %d.\n", pSocket);
     fflush(stdout);
   }

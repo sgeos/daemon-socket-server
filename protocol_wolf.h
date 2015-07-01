@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <sys/select.h>
+#include "user_control.h"
 
 typedef enum gameStatus_t {
   GAME_NONE = 0,
@@ -33,10 +34,9 @@ typedef struct gamePlayer_t {
 
 typedef struct gameState_t {
   gameStatus status;
-  int playerMax;
-  int playerCount;
   int humansAlive;
   int wolvesfAlive;
+  userControl_t *userControl;
   gamePlayer **player;
 } gameState;
 
