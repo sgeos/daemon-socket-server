@@ -11,9 +11,7 @@
 #include "log.h"
 #include "protocol_wolf.h"
 
-char *gMessageBuffer = NULL;
-int gBufferSize = 0;
-
+buffer_t *gMessageBuffer = NULL;
 gameState *gGameState = NULL;
 fd_set gPlayerSet;
 fd_set gReadySet;
@@ -88,42 +86,6 @@ bool gameStateCleanup(gameState **pGameState)
   return success;
 }
 
-bool freeBuffer(void) {
-  bool success;
-  if (NULL != gMessageBuffer) {
-    free(gMessageBuffer);
-    infof("Freed message buffer of size %d.", gBufferSize);
-    gBufferSize = 0;
-    success = true;
-  }
-  else {
-    warning("Failed to free message buffer.");
-    success = false;
-  }
-  return success;
-}
-
-bool allocateBuffer(int pBufferSize)
-{
-  if (NULL != gMessageBuffer) {
-    freeBuffer();
-  }
-
-  bool success;
-  gMessageBuffer = calloc(pBufferSize, sizeof(char));
-  if (NULL == gMessageBuffer) {
-    errorf("Failed to allocate buffer of size %d.", pBufferSize);
-    gBufferSize = 0;
-    success = false;
-  }
-  else {
-    gBufferSize = pBufferSize;
-    infof("Allocated buffer of size %d.", pBufferSize);
-    success = true;
-  }
-  return success;
-}
-
 bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
   UNUSED(pSocket);
@@ -134,7 +96,7 @@ bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSi
   FD_ZERO(&gReadySet);
 
   bool success = true;
-  success = success && allocateBuffer(pBufferSize);
+  success = success && bufferAllocate(&gMessageBuffer, pBufferSize);
   success = success && gameStateInit(&gGameState, 0, pMaxSocket);
   gGameState->status = GAME_PENDING;
   return success;
@@ -154,6 +116,10 @@ bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
 
 bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
+  UNUSED(pMaxSocket);
+  bufferGrow(&gMessageBuffer, pBufferSize);
+  bufferClear(&gMessageBuffer);
+
   // switch based on game mode
   switch (gGameState->status) {
     case GAME_PENDING:
@@ -168,11 +134,6 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
     break;
   }
 
-  if (gBufferSize < pBufferSize) {
-    freeBuffer();
-    allocateBuffer(pBufferSize);
-  }
-
   infof("Communication on socket %d.\n", pSocket);
 
   // send(), recv(), close()
@@ -182,14 +143,13 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   int flags = 0;
 
   // Receive a message from client
-  memset(gMessageBuffer, 0, gBufferSize * sizeof(char));
-  messageSize = recv(pSocket, gMessageBuffer, gBufferSize, flags);
+  messageSize = recv(pSocket, gMessageBuffer->buffer, gMessageBuffer->size, flags);
   if (0 < messageSize)
   {
     for (int s = 0; s <= pMaxSocket; s++) {
       // Relay the message to all other clients
       if (s != pSocket && FD_ISSET(s, pSocketSet)) {
-        send(s, gMessageBuffer, strlen(gMessageBuffer), flags);
+        send(s, gMessageBuffer->buffer, strlen(gMessageBuffer->buffer), flags);
       }
     }
   }
@@ -216,7 +176,7 @@ bool protocolCleanup(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
   UNUSED(pBufferSize);
   bool success = true;
   success = success && gameStateCleanup(&gGameState);
-  success = success && freeBuffer();
+  success = success && bufferFree(&gMessageBuffer);
   return success;
 }
 

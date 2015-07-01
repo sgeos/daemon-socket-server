@@ -25,6 +25,10 @@ args_test.o: args.c
 .c.o:
 	$(CC) $(CFLAGS) $< -o $@
 
+.PHONY: clear
+clear:
+	clear
+
 .PHONY: clean
 clean:
 	rm -f *.o $(EXECUTABLES)
