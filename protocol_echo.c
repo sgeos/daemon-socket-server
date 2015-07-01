@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include "utility.h"
 #include "log.h"
+#include "network_message.h"
 
 buffer_t *gMessageBuffer = NULL;
 
@@ -50,7 +51,7 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   if (0 < messageSize)
   {
     // Return the message to the sender
-    send(pSocket, gMessageBuffer->buffer, strlen(gMessageBuffer->buffer), flags);
+    networkMessagePrivate(pSocket, gMessageBuffer->buffer);
   }
   else if (0 == messageSize)
   {

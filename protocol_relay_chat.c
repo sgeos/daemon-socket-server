@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include "utility.h"
 #include "log.h"
+#include "network_message.h"
 
 buffer_t *gMessageBuffer = NULL;
 
@@ -49,12 +50,8 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   messageSize = recv(pSocket, gMessageBuffer->buffer, gMessageBuffer->size, flags);
   if (0 < messageSize)
   {
-    for (int s = 0; s <= pMaxSocket; s++) {
-      // Relay the message to all other clients
-      if (s != pSocket && FD_ISSET(s, pSocketSet)) {
-        send(s, gMessageBuffer->buffer, strlen(gMessageBuffer->buffer), flags);
-      }
-    }
+    // Relay the message to all other clients
+    networkMessagePublic(pSocket, pSocketSet, pMaxSocket, gMessageBuffer->buffer);
   }
   else if (0 == messageSize)
   {

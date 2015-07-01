@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -13,6 +14,7 @@
 #include "utility.h"
 #include "args.h"
 #include "log.h"
+#include "network_message.h"
 
 const char *PORT = "32001";
 const int BACKLOG = 10;
@@ -105,11 +107,13 @@ bool socketSetInitialize(int pSocket, fd_set *pSocketSet, bool pInteractive)
   FD_SET(pSocket, pSocketSet);
   if (pInteractive) {
     FD_SET(STDIN_FILENO, pSocketSet);
+    FD_SET(STDOUT_FILENO, pSocketSet);
     info("Local control commands enabled.");
   }
   else {
     info("Local control commands disabled.");
   }
+  networkMessageExemptSet(pSocketSet);
   bool success = true;
   return success;
 }
@@ -118,11 +122,12 @@ bool socketSelect(int pMaxSocket, fd_set *pSocketSet)
 {
   bool success = 0 <= select(pMaxSocket + 1, pSocketSet, NULL, NULL, NULL);
   if (!success) {
-    error("Failed to read from socket using select.");
+    errorf("Failed to read from socket using select. %s.", strerror(errno));
   }
   return success;
 }
 
+// FIXME: this is a mess because it is calling protocolConnect() at the end
 bool socketConnectionNew(int pSocket, int *pMaxSocket, fd_set *pSocketSet, int pBufferSize)
 {
   bool success;
@@ -183,12 +188,13 @@ bool mainLoop(int argc, char **argv)
   success = success && protocolInit(socket, &socketSet, maxSocket, bufferSize);
   bool done = !success; // skip loop on error
   while (!done) {
-    fd_set readSocketSet = socketSet;
+    fd_set readSocketSet;
+    FD_COPY(&socketSet, &readSocketSet);
     success = success && socketSelect(maxSocket, &readSocketSet);
     for (int s = 0; !done && s <= maxSocket; s++) {
       if (FD_ISSET(s, &readSocketSet)) {
         if (s == socket) {
-          socketConnectionNew(socket, &maxSocket, &socketSet, bufferSize); // failure is not terminal
+          socketConnectionNew(s, &maxSocket, &socketSet, bufferSize); // failure is not terminal
         }
         else if (STDIN_FILENO == s) {
           // system control

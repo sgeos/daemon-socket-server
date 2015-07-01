@@ -10,6 +10,8 @@ typedef struct buffer_t {
   int size;
 } buffer_t;
 
+bool isCommand(const char *pCommand, const char *pBuffer);
+void stripNewlines(char *pBuffer, int pLength);
 bool bufferClear(buffer_t **pBuffer);
 bool bufferAllocate(buffer_t **pBuffer, int pBufferSize);
 bool bufferGrow(buffer_t **pBuffer, int pBufferSize);

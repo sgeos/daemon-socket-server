@@ -10,24 +10,6 @@
 #include "utility.h"
 #include "log.h"
 
-bool isCommand(const char *pCommand, const char *pBuffer)
-{
-  bool success = 0 == strncmp(pBuffer, pCommand, strlen(pCommand));
-  return success;
-}
-
-void stripNewlines(char *pBuffer, int pLength)
-{
-  for (int i = pLength; 0 <= i; i--) {
-    if ('\0' == pBuffer[i] || '\n' == pBuffer[i]) {
-      pBuffer[i] = '\0';
-    }
-    else {
-      return;
-    }
-  }
-}
-
 bool localControl(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
   UNUSED(pSocket);

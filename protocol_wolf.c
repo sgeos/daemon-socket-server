@@ -9,12 +9,53 @@
 #include <netdb.h>
 #include "utility.h"
 #include "log.h"
+#include "network_message.h"
 #include "protocol_wolf.h"
 
 buffer_t *gMessageBuffer = NULL;
 gameState *gGameState = NULL;
 fd_set gPlayerSet;
 fd_set gReadySet;
+
+void gamePendingPlayerReady()
+{
+}
+
+void gameUpdatePending(int pSocket, fd_set *pSocketSet, int pMaxSocket, char *pMessage)
+{
+  UNUSED(pSocketSet);
+  if (isCommand("ready", pMessage)) {
+    FD_SET(pSocket, &gReadySet);
+    infof("Player %d is ready.", pSocket);
+  }
+  else {
+    FD_CLR(pSocket, &gReadySet);
+    infof("Player %d is not ready.", pSocket);
+  }
+  if (1 < gGameState->playerCount && 0 == memcmp(&gPlayerSet, &gReadySet, sizeof(fd_set))) {
+    gGameState->status = GAME_STARTED;
+    networkMessageAll(&gPlayerSet, pMaxSocket, "game start");
+    info("Game started.");
+  }
+}
+
+void gameUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, char *pMessage)
+{
+  // switch based on game mode
+  switch (gGameState->status) {
+    case GAME_PENDING:
+      gameUpdatePending(pSocket, pSocketSet, pMaxSocket, pMessage);
+    break;
+    case GAME_STARTED:
+    break;
+    case GAME_OVER:
+    break;
+    case GAME_NONE:
+    default:
+      error("Bad game status.");
+    break;
+  }
+}
 
 bool gameStateInit(gameState **pGameState, int pPlayerCount, int pPlayerMax)
 {
@@ -110,6 +151,7 @@ bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
 
   infof("New connection on socket %d.\n", pSocket);
   FD_SET(pSocket, &gPlayerSet);
+  gGameState->playerCount++;
   bool success = true;
   return success;
 }
@@ -119,20 +161,6 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   UNUSED(pMaxSocket);
   bufferGrow(&gMessageBuffer, pBufferSize);
   bufferClear(&gMessageBuffer);
-
-  // switch based on game mode
-  switch (gGameState->status) {
-    case GAME_PENDING:
-    break;
-    case GAME_STARTED:
-    break;
-    case GAME_OVER:
-    break;
-    case GAME_NONE:
-    default:
-      error("Bad game status.");
-    break;
-  }
 
   infof("Communication on socket %d.\n", pSocket);
 
@@ -146,17 +174,15 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   messageSize = recv(pSocket, gMessageBuffer->buffer, gMessageBuffer->size, flags);
   if (0 < messageSize)
   {
-    for (int s = 0; s <= pMaxSocket; s++) {
-      // Relay the message to all other clients
-      if (s != pSocket && FD_ISSET(s, pSocketSet)) {
-        send(s, gMessageBuffer->buffer, strlen(gMessageBuffer->buffer), flags);
-      }
-    }
+    gameUpdate(pSocket, pSocketSet, pMaxSocket, gMessageBuffer->buffer);
   }
   else if (0 == messageSize)
   {
     close(pSocket);
     FD_CLR(pSocket, pSocketSet);
+    FD_CLR(pSocket, &gPlayerSet);
+    FD_CLR(pSocket, &gReadySet);
+    gGameState->playerCount--;
     noticef("Client disconnected from socket %d.\n", pSocket);
     fflush(stdout);
   }
