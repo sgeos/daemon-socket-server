@@ -9,9 +9,61 @@
 #include <netdb.h>
 #include "utility.h"
 #include "log.h"
+#include "protocol_wolf.h"
 
 char *gMessageBuffer = NULL;
 int gBufferSize = 0;
+
+bool gameStart(gameState **pGameState, int pPlayerCount, int pPlayerMax)
+{
+  bool success = true;
+  if (NULL == *pGameState) {
+    *pGameState = calloc(1, sizeof(pGameState));
+    if (NULL == *pGameState) {
+      error("Failed to allocate game state.");
+      success = false;
+    }
+  }
+  if (success && NULL == (*pGameState)->player) {
+    (*pGameState)->player = calloc(pPlayerMax, sizeof(gamePlayer *));
+    if (NULL == (*pGameState)->player) {
+      errorf("Failed to allocate array for %d player(s).", pPlayerMax);
+      (*pGameState)->playerCount = 0;
+      (*pGameState)->playerMax = 0;
+      success = false;
+    }
+    else {
+      (*pGameState)->playerCount = pPlayerCount;
+      (*pGameState)->playerMax = pPlayerMax;
+    }
+  }
+  return success;
+}
+
+bool gameEnd(gameState **pGameState)
+{
+  for (int i = 0; i < (*pGameState)->playerMax; i++) {
+    if (NULL != (*pGameState)->player[i]) {
+      free((*pGameState)->player[i]);
+      (*pGameState)->playerCount--;
+    }
+  }
+  info("Released memory for individual player data.");
+  if (NULL != (*pGameState)->player) {
+    free((*pGameState)->player);
+    (*pGameState)->player = NULL;
+    (*pGameState)->playerCount = 0;
+    (*pGameState)->playerMax = 0;
+  }
+  info("Released memory for player data array.");
+  if (NULL != *pGameState) {
+    free(*pGameState);
+    *pGameState = NULL;
+  }
+  info("Released memory for root game state.");
+  bool success = true;
+  return success;
+}
 
 bool freeBuffer(void) {
   bool success;
@@ -70,8 +122,6 @@ bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
 
 bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
-  UNUSED(pMaxSocket);
-
   if (gBufferSize < pBufferSize) {
     freeBuffer();
     allocateBuffer(pBufferSize);
@@ -90,8 +140,12 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   messageSize = recv(pSocket, gMessageBuffer, gBufferSize, flags);
   if (0 < messageSize)
   {
-    // Return the message to the sender
-    send(pSocket, gMessageBuffer, strlen(gMessageBuffer), flags);
+    for (int s = 0; s <= pMaxSocket; s++) {
+      // Relay the message to all other clients
+      if (s != pSocket && FD_ISSET(s, pSocketSet)) {
+        send(s, gMessageBuffer, strlen(gMessageBuffer), flags);
+      }
+    }
   }
   else if (0 == messageSize)
   {

@@ -20,7 +20,10 @@ const int BUFFER_SIZE = 2000;
 const bool INTERACTIVE = true;
 
 bool localControl(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize);
-bool socketProtocol(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize);
+bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize);
+bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize);
+bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize);
+bool protocolCleanup(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize);
 
 bool getAddressInfo(const char *pPort, struct addrinfo **pAddressInfo)
 {
@@ -177,6 +180,7 @@ bool mainLoop(int argc, char **argv)
 
   // main loop
   int maxSocket = socket;
+  success = success && protocolInit(socket, &socketSet, maxSocket, bufferSize);
   bool done = !success; // skip loop on error
   while (!done) {
     fd_set readSocketSet = socketSet;
@@ -184,7 +188,8 @@ bool mainLoop(int argc, char **argv)
     for (int s = 0; !done && s <= maxSocket; s++) {
       if (FD_ISSET(s, &readSocketSet)) {
         if (s == socket) {
-          socketConnectionNew(socket, &maxSocket, &socketSet); // failure is not terminal
+          bool success = socketConnectionNew(socket, &maxSocket, &socketSet); // failure is not terminal
+          success = success && protocolConnect(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
         }
         else if (STDIN_FILENO == s) {
           // system control
@@ -192,12 +197,14 @@ bool mainLoop(int argc, char **argv)
         }
         else {
           // existing connection
-          socketProtocol(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
+          bool success = protocolUpdate(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
+          UNUSED(success);
         }
       }
     }
     done = done || !success;
   }
+  protocolCleanup(socket, &socketSet, maxSocket, bufferSize); // always
 
   close(socket);
 

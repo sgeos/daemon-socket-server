@@ -5,6 +5,7 @@
 *.db
 echo
 relay_chat
+wolf
 args_test
 
 ########################################
