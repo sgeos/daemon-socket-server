@@ -16,6 +16,7 @@ int gBufferSize = 0;
 
 gameState *gGameState = NULL;
 fd_set gPlayerSet;
+fd_set gReadySet;
 
 bool gameStateInit(gameState **pGameState, int pPlayerCount, int pPlayerMax)
 {
@@ -128,9 +129,14 @@ bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSi
   UNUSED(pSocket);
   UNUSED(pSocketSet);
   UNUSED(pMaxSocket);
+
+  FD_ZERO(&gPlayerSet);
+  FD_ZERO(&gReadySet);
+
   bool success = true;
   success = success && allocateBuffer(pBufferSize);
   success = success && gameStateInit(&gGameState, 0, pMaxSocket);
+  gGameState->status = GAME_PENDING;
   return success;
 }
 
@@ -141,12 +147,27 @@ bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
   UNUSED(pBufferSize);
 
   infof("New connection on socket %d.\n", pSocket);
+  FD_SET(pSocket, &gPlayerSet);
   bool success = true;
   return success;
 }
 
 bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
+  // switch based on game mode
+  switch (gGameState->status) {
+    case GAME_PENDING:
+    break;
+    case GAME_STARTED:
+    break;
+    case GAME_OVER:
+    break;
+    case GAME_NONE:
+    default:
+      error("Bad game status.");
+    break;
+  }
+
   if (gBufferSize < pBufferSize) {
     freeBuffer();
     allocateBuffer(pBufferSize);

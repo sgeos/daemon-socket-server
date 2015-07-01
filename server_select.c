@@ -123,7 +123,7 @@ bool socketSelect(int pMaxSocket, fd_set *pSocketSet)
   return success;
 }
 
-bool socketConnectionNew(int pSocket, int *pMaxSocket, fd_set *pSocketSet)
+bool socketConnectionNew(int pSocket, int *pMaxSocket, fd_set *pSocketSet, int pBufferSize)
 {
   bool success;
   int newSocket;
@@ -143,7 +143,7 @@ bool socketConnectionNew(int pSocket, int *pMaxSocket, fd_set *pSocketSet)
     }
     success = true;
   }
-  return success;
+  return success && protocolConnect(newSocket, pSocketSet, *pMaxSocket, pBufferSize); // failure is not terminal
 }
 
 bool mainLoop(int argc, char **argv)
@@ -188,8 +188,7 @@ bool mainLoop(int argc, char **argv)
     for (int s = 0; !done && s <= maxSocket; s++) {
       if (FD_ISSET(s, &readSocketSet)) {
         if (s == socket) {
-          bool success = socketConnectionNew(socket, &maxSocket, &socketSet); // failure is not terminal
-          success = success && protocolConnect(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
+          socketConnectionNew(socket, &maxSocket, &socketSet, bufferSize); // failure is not terminal
         }
         else if (STDIN_FILENO == s) {
           // system control
@@ -197,8 +196,7 @@ bool mainLoop(int argc, char **argv)
         }
         else {
           // existing connection
-          bool success = protocolUpdate(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
-          UNUSED(success);
+          protocolUpdate(s, &socketSet, maxSocket, bufferSize); // failure is not terminal
         }
       }
     }

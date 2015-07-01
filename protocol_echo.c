@@ -10,51 +10,14 @@
 #include "utility.h"
 #include "log.h"
 
-char *gMessageBuffer = NULL;
-int gBufferSize = 0;
-
-bool freeBuffer(void) {
-  bool success;
-  if (NULL != gMessageBuffer) {
-    free(gMessageBuffer);
-    infof("Freed message buffer of size %d.", gBufferSize);
-    gBufferSize = 0;
-    success = true;
-  }
-  else {
-    warning("Failed to free message buffer.");
-    success = false;
-  }
-  return success;
-}
-
-bool allocateBuffer(int pBufferSize)
-{
-  if (NULL != gMessageBuffer) {
-    freeBuffer();
-  }
-
-  bool success;
-  gMessageBuffer = calloc(pBufferSize, sizeof(char));
-  if (NULL == gMessageBuffer) {
-    errorf("Failed to allocate buffer of size %d.", pBufferSize);
-    gBufferSize = 0;
-    success = false;
-  }
-  else {
-    gBufferSize = pBufferSize;
-    infof("Allocated buffer of size %d.", pBufferSize);
-    success = true;
-  }
-  return success;
-}
+buffer_t *gMessageBuffer = NULL;
 
 bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
   UNUSED(pSocket);
   UNUSED(pSocketSet);
   UNUSED(pMaxSocket);
-  return allocateBuffer(pBufferSize);
+  return bufferAllocate(&gMessageBuffer, pBufferSize);
 }
 
 bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
@@ -71,11 +34,8 @@ bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
 bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
 {
   UNUSED(pMaxSocket);
-
-  if (gBufferSize < pBufferSize) {
-    freeBuffer();
-    allocateBuffer(pBufferSize);
-  }
+  bufferGrow(&gMessageBuffer, pBufferSize);
+  bufferClear(&gMessageBuffer);
 
   infof("Communication on socket %d.\n", pSocket);
 
@@ -86,12 +46,11 @@ bool protocolUpdate(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffer
   int flags = 0;
 
   // Receive a message from client
-  memset(gMessageBuffer, 0, gBufferSize * sizeof(char));
-  messageSize = recv(pSocket, gMessageBuffer, gBufferSize, flags);
+  messageSize = recv(pSocket, gMessageBuffer->buffer, gMessageBuffer->size, flags);
   if (0 < messageSize)
   {
     // Return the message to the sender
-    send(pSocket, gMessageBuffer, strlen(gMessageBuffer), flags);
+    send(pSocket, gMessageBuffer->buffer, strlen(gMessageBuffer->buffer), flags);
   }
   else if (0 == messageSize)
   {
@@ -114,6 +73,6 @@ bool protocolCleanup(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
   UNUSED(pSocketSet);
   UNUSED(pMaxSocket);
   UNUSED(pBufferSize);
-  return freeBuffer();
+  return bufferFree(&gMessageBuffer);
 }
 
