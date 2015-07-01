@@ -14,15 +14,28 @@
 char *gMessageBuffer = NULL;
 int gBufferSize = 0;
 
-bool gameStart(gameState **pGameState, int pPlayerCount, int pPlayerMax)
+gameState *gGameState = NULL;
+fd_set gPlayerSet;
+
+bool gameStateInit(gameState **pGameState, int pPlayerCount, int pPlayerMax)
 {
   bool success = true;
   if (NULL == *pGameState) {
-    *pGameState = calloc(1, sizeof(pGameState));
+    *pGameState = calloc(1, sizeof(gameState));
     if (NULL == *pGameState) {
       error("Failed to allocate game state.");
       success = false;
     }
+    else {
+      // running into a malloc erro
+      (*pGameState)->player = NULL;
+      (*pGameState)->playerCount = 0;
+      (*pGameState)->playerMax = 0;
+      info("Allocated game state.");
+    }
+  }
+  else {
+    info("Game state already exists.");
   }
   if (success && NULL == (*pGameState)->player) {
     (*pGameState)->player = calloc(pPlayerMax, sizeof(gamePlayer *));
@@ -33,14 +46,18 @@ bool gameStart(gameState **pGameState, int pPlayerCount, int pPlayerMax)
       success = false;
     }
     else {
+      infof("Allocate array for %d player(s).", pPlayerMax);
       (*pGameState)->playerCount = pPlayerCount;
       (*pGameState)->playerMax = pPlayerMax;
     }
   }
+  else {
+    info("Player data array already exists.");
+  }
   return success;
 }
 
-bool gameEnd(gameState **pGameState)
+bool gameStateCleanup(gameState **pGameState)
 {
   for (int i = 0; i < (*pGameState)->playerMax; i++) {
     if (NULL != (*pGameState)->player[i]) {
@@ -48,7 +65,12 @@ bool gameEnd(gameState **pGameState)
       (*pGameState)->playerCount--;
     }
   }
-  info("Released memory for individual player data.");
+  if (0 < (*pGameState)->playerMax) {
+    info("Released memory for individual player data.");
+  }
+  else {
+    info("No memory to release for individual player data.");
+  }
   if (NULL != (*pGameState)->player) {
     free((*pGameState)->player);
     (*pGameState)->player = NULL;
@@ -106,7 +128,10 @@ bool protocolInit(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSi
   UNUSED(pSocket);
   UNUSED(pSocketSet);
   UNUSED(pMaxSocket);
-  return allocateBuffer(pBufferSize);
+  bool success = true;
+  success = success && allocateBuffer(pBufferSize);
+  success = success && gameStateInit(&gGameState, 0, pMaxSocket);
+  return success;
 }
 
 bool protocolConnect(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBufferSize)
@@ -168,6 +193,9 @@ bool protocolCleanup(int pSocket, fd_set *pSocketSet, int pMaxSocket, int pBuffe
   UNUSED(pSocketSet);
   UNUSED(pMaxSocket);
   UNUSED(pBufferSize);
-  return freeBuffer();
+  bool success = true;
+  success = success && gameStateCleanup(&gGameState);
+  success = success && freeBuffer();
+  return success;
 }
 
